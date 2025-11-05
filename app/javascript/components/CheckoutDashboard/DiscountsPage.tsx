@@ -67,6 +67,12 @@ export type OfferCode = {
   duration_in_billing_cycles: Duration | null;
   minimum_quantity: number | null;
   minimum_amount_cents: number | null;
+  required_product?: {
+    id: string;
+    within_days: number;
+    within_percentage: number;
+    after_percentage: number;
+  } | null;
 };
 
 export type SortKey = "name" | "revenue" | "uses" | "term";
@@ -620,6 +626,10 @@ const DiscountsPage = ({ offer_codes, pages, products, pagination: initialPagina
             minimumQuantity: offerCode.minimum_quantity,
             durationInBillingCycles: offerCode.duration_in_billing_cycles,
             minimumAmount: offerCode.minimum_amount_cents,
+            requiredProductId: offerCode.required_product?.id ?? null,
+            requiredProductWithinDays: offerCode.required_product?.within_days ?? null,
+            requiredProductWithinPercentage: offerCode.required_product?.within_percentage ?? null,
+            requiredProductAfterPercentage: offerCode.required_product?.after_percentage ?? null,
           });
           resetQueryState();
           setState({ offerCodes, pagination });
@@ -657,6 +667,10 @@ const DiscountsPage = ({ offer_codes, pages, products, pagination: initialPagina
             minimumQuantity: offerCode.minimum_quantity,
             durationInBillingCycles: offerCode.duration_in_billing_cycles,
             minimumAmount: offerCode.minimum_amount_cents,
+            requiredProductId: offerCode.required_product?.id ?? null,
+            requiredProductWithinDays: offerCode.required_product?.within_days ?? null,
+            requiredProductWithinPercentage: offerCode.required_product?.within_percentage ?? null,
+            requiredProductAfterPercentage: offerCode.required_product?.after_percentage ?? null,
           });
           resetQueryState();
           setState({ offerCodes, pagination });
@@ -747,6 +761,20 @@ const Form = ({
     offerCode?.currency_type ?? selectedProducts[0]?.currency_type ?? products[0]?.currency_type ?? "usd",
   );
 
+  const [requiredProductId, setRequiredProductId] = React.useState<string | null>(offerCode?.required_product?.id ?? null);
+  const [requiredProduct, setRequiredProduct] = React.useState<Product | null>(
+    requiredProductId ? products.find(p => p.id === requiredProductId) ?? null : null
+  );
+  const [requiredProductWithinDays, setRequiredProductWithinDays] = React.useState<number | null>(
+    offerCode?.required_product?.within_days ?? null
+  );
+  const [requiredProductWithinPercentage, setRequiredProductWithinPercentage] = React.useState<number | null>(
+    offerCode?.required_product?.within_percentage ?? null
+  );
+  const [requiredProductAfterPercentage, setRequiredProductAfterPercentage] = React.useState<number | null>(
+    offerCode?.required_product?.after_percentage ?? null
+  );
+
   const canSetDuration = (universal ? products : selectedProducts).some(
     ({ is_tiered_membership }) => is_tiered_membership,
   );
@@ -809,6 +837,14 @@ const Form = ({
       minimum_quantity: hasMinimumQuantity ? minimumQuantity.value : null,
       duration_in_billing_cycles: canSetDuration ? durationInBillingCycles : null,
       minimum_amount_cents: hasMinimumAmount ? minimumAmount.value : null,
+      required_product: requiredProductId
+        ? {
+            id: requiredProductId,
+            within_days: requiredProductWithinDays ?? null,
+            within_percentage: requiredProductWithinPercentage ?? null,
+            after_percentage: requiredProductAfterPercentage ?? null,
+          }
+        : null,
     });
   };
 
@@ -967,6 +1003,96 @@ const Form = ({
           </fieldset>
           <fieldset className="gap-4">
             <legend>Settings</legend>
+            <Details
+              className="toggle"
+              open={!!requiredProductId}
+              summary={
+                <label>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={!!requiredProductId}
+                    onChange={(evt) => {
+                      if (!evt.target.checked) {
+                        setRequiredProductId(null);
+                        setRequiredProductWithinDays(null);
+                        setRequiredProductWithinPercentage(null);
+                        setRequiredProductAfterPercentage(null);
+                      }
+                    }}
+                  />
+                  Require previous product purchase
+                </label>
+              }
+            >
+              <div className="dropdown">
+                <fieldset>
+                  <legend>
+                    <label htmlFor={`${uid}requiredProduct`}>Required product</label>
+                  </legend>
+                  <Select
+                    inputId={`${uid}requiredProduct`}
+                    instanceId={`${uid}requiredProduct`}
+                    options={products
+                      .filter((product) => !product.archived)
+                      .map((product) => ({ id: product.id, label: product.name }))}
+                    value={requiredProduct ? { id: requiredProduct.id, label: requiredProduct.name } : null}
+                    isClearable
+                    placeholder="Product that must have been purchased"
+                    onChange={(selected) => {
+                      const product = selected ? products.find(p => p.id === selected.id) : null;
+                      setRequiredProductId(product?.id ?? null);
+                      setRequiredProduct(product ?? null);
+                    }}
+                  />
+                </fieldset>
+                <fieldset>
+                  <legend>
+                    <label htmlFor={`${uid}requiredProductWithinDays`}>Days to qualify for higher discount</label>
+                  </legend>
+                  <NumberInput
+                    value={requiredProductWithinDays}
+                    onChange={(value) => {
+                      if (value === null || value >= 0) setRequiredProductWithinDays(value);
+                    }}
+                  >
+                    {(props) => (
+                      <input id={`${uid}requiredProductWithinDays`} placeholder="180" {...props} />
+                    )}
+                  </NumberInput>
+                </fieldset>
+                <fieldset>
+                  <legend>
+                    <label htmlFor={`${uid}requiredProductWithinPercentage`}>Discount percentage within days</label>
+                  </legend>
+                  <NumberInput
+                    value={requiredProductWithinPercentage}
+                    onChange={(value) => {
+                      if (value === null || (value >= 0 && value <= 100)) setRequiredProductWithinPercentage(value);
+                    }}
+                  >
+                    {(props) => (
+                      <input id={`${uid}requiredProductWithinPercentage`} placeholder="100" {...props} />
+                    )}
+                  </NumberInput>
+                </fieldset>
+                <fieldset>
+                  <legend>
+                    <label htmlFor={`${uid}requiredProductAfterPercentage`}>Discount percentage after days</label>
+                  </legend>
+                  <NumberInput
+                    value={requiredProductAfterPercentage}
+                    onChange={(value) => {
+                      if (value === null || (value >= 0 && value <= 100)) setRequiredProductAfterPercentage(value);
+                    }}
+                  >
+                    {(props) => (
+                      <input id={`${uid}requiredProductAfterPercentage`} placeholder="50" {...props} />
+                    )}
+                  </NumberInput>
+                </fieldset>
+              </div>
+            </Details>
             <Details
               className="toggle"
               open={limitQuantity}

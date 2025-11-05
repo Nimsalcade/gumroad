@@ -11,9 +11,10 @@ class OfferCodeDiscountComputingService
   #   => A[2], B[3], C[2] --> A[2], C[2]
   #   => A[2], C[3]       --> A[2]
 
-  def initialize(code, products)
+  def initialize(code, products, current_user: nil)
     @code = code
     @products = products
+    @current_user = current_user
   end
 
   def process
@@ -50,13 +51,46 @@ class OfferCodeDiscountComputingService
         .where(unique_permalink: products.values.map { it[:permalink] })
     end
 
+    def adjust_for_required_product(offer_code)
+      return offer_code unless offer_code.required_product_id
+
+      # Find user's earliest purchase of the required product
+      purchase = Purchase.where(buyer: @current_user, link_id: offer_code.required_product_id)
+                        .order(created_at: :asc)
+                        .first
+
+      return nil unless purchase # User hasn't bought required product
+
+      days_since_purchase = (Time.current - purchase.created_at) / 1.day
+
+      if days_since_purchase <= offer_code.required_product_within_days
+        # Apply higher discount for recent purchasers
+        if offer_code.is_percent?
+          offer_code.amount_percentage = offer_code.required_product_within_percentage
+        else
+          offer_code.amount_cents = (offer_code.amount_cents * offer_code.required_product_within_percentage / 100.0).round
+        end
+      else
+        # Apply lower discount for older purchasers
+        if offer_code.is_percent?
+          offer_code.amount_percentage = offer_code.required_product_after_percentage
+        else
+          offer_code.amount_cents = (offer_code.amount_cents * offer_code.required_product_after_percentage / 100.0).round
+        end
+      end
+
+      offer_code
+    end
+
     def offer_codes
       return OfferCode.none if code.blank?
 
       @_offer_codes ||= OfferCode
-        .includes(:products)
+        .includes(:products, :required_product)
         .where(user_id: links.map(&:user_id), code:)
         .alive
+        .map { |oc| adjust_for_required_product(oc) }
+        .compact
     end
 
     def offer_codes_by_user_id

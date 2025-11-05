@@ -59,6 +59,10 @@ type DiscountPayload = {
   minimumQuantity: number | null;
   durationInBillingCycles: Duration | null;
   minimumAmount: number | null;
+  requiredProductId?: string | null;
+  requiredProductWithinDays?: number | null;
+  requiredProductWithinPercentage?: number | null;
+  requiredProductAfterPercentage?: number | null;
 };
 
 export const getPagedDiscounts = (page: number, query: string | null, sort: Sort<SortKey> | null) => {
@@ -91,6 +95,10 @@ export const createDiscount = async ({
   minimumQuantity,
   durationInBillingCycles,
   minimumAmount,
+  requiredProductId,
+  requiredProductWithinDays,
+  requiredProductWithinPercentage,
+  requiredProductAfterPercentage,
 }: DiscountPayload) => {
   const response = await request({
     method: "POST",
@@ -103,6 +111,10 @@ export const createDiscount = async ({
       amount_cents: discount.type === "cents" ? discount.value : undefined,
       selected_product_ids: universal ? null : selectedProductIds,
       universal,
+      required_product_id: requiredProductId,
+      required_product_within_days: requiredProductWithinDays,
+      required_product_within_percentage: requiredProductWithinPercentage,
+      required_product_after_percentage: requiredProductAfterPercentage,
       max_purchase_count: maxQuantity,
       currency_type: currencyCode,
       valid_at: validAt,
@@ -134,6 +146,10 @@ export const updateDiscount = async (
     minimumQuantity,
     durationInBillingCycles,
     minimumAmount,
+    requiredProductId,
+    requiredProductWithinDays,
+    requiredProductWithinPercentage,
+    requiredProductAfterPercentage,
   }: DiscountPayload,
 ) => {
   const response = await request({
@@ -147,6 +163,10 @@ export const updateDiscount = async (
       amount_cents: discount.type === "cents" ? discount.value : undefined,
       selected_product_ids: universal ? null : selectedProductIds,
       universal,
+      required_product_id: requiredProductId,
+      required_product_within_days: requiredProductWithinDays,
+      required_product_within_percentage: requiredProductWithinPercentage,
+      required_product_after_percentage: requiredProductAfterPercentage,
       max_purchase_count: maxQuantity,
       currency_type: currencyCode,
       valid_at: validAt,

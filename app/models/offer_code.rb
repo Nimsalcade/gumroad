@@ -20,6 +20,7 @@ class OfferCode < ApplicationRecord
 
   has_and_belongs_to_many :products, class_name: "Link", join_table: "offer_codes_products", association_foreign_key: "product_id"
   belongs_to :user
+  belongs_to :required_product, class_name: "Link", optional: true
   has_many :purchases
   has_many :purchases_that_count_towards_offer_code_uses, -> { counts_towards_offer_code_uses }, class_name: "Purchase"
   has_one :upsell
@@ -40,6 +41,7 @@ class OfferCode < ApplicationRecord
 
   validates_uniqueness_of :code, scope: %i[user_id deleted_at], if: :universal?, unless: :deleted?, message: "must be unique."
   validate :code_validation, unless: lambda { |offer_code| offer_code.deleted? || offer_code.universal? || offer_code.upsell.present? }
+  validate :required_product_validation
 
   # Public: Scope to get only universal offer codes which is when an offer applies to all user's products.
   # Fixed-amount-off offer codes only show up on products that match their currency. That's why this scope takes a currency_type.
@@ -138,6 +140,15 @@ class OfferCode < ApplicationRecord
       json[:amount_cents] = amount_cents
     end
 
+    if required_product.present?
+      json[:required_product] = {
+        id: required_product.external_id,
+        within_days: required_product_within_days,
+        within_percentage: required_product_within_percentage,
+        after_percentage: required_product_after_percentage,
+      }
+    end
+
     json
   end
 
@@ -197,6 +208,33 @@ class OfferCode < ApplicationRecord
   end
 
   private
+    def required_product_validation
+      return unless required_product_id.present?
+
+      if required_product_within_days.blank?
+        errors.add(:base, "Days to qualify for higher discount must be set when requiring a product")
+      elsif required_product_within_days <= 0
+        errors.add(:base, "Days to qualify must be greater than 0")
+      end
+
+      if required_product_within_percentage.blank?
+        errors.add(:base, "Discount percentage within days must be set when requiring a product")
+      elsif required_product_within_percentage < 0 || required_product_within_percentage > 100
+        errors.add(:base, "Discount percentage within days must be between 0 and 100")
+      end
+
+      if required_product_after_percentage.blank?
+        errors.add(:base, "Discount percentage after days must be set when requiring a product")
+      elsif required_product_after_percentage < 0 || required_product_after_percentage > 100
+        errors.add(:base, "Discount percentage after days must be between 0 and 100")
+      end
+
+      # Validate that required product belongs to the same seller
+      unless required_product.user_id == user_id
+        errors.add(:base, "Required product must be one of your products")
+      end
+    end
+
     def max_purchase_count_is_greater_than_or_equal_to_inventory_sold
       return if deleted_at.present?
       return unless max_purchase_count_changed?

@@ -2,7 +2,7 @@
 
 class OfferCodesController < ApplicationController
   def compute_discount
-    response = OfferCodeDiscountComputingService.new(params[:code], params[:products]).process
+    response = OfferCodeDiscountComputingService.new(params[:code], params[:products], current_user: current_user).process
     response = if response[:error_code].present?
       error_message = case response.fetch(:error_code)
                       when :insufficient_times_of_use
